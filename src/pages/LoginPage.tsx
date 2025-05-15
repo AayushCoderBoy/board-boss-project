@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,13 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { signIn, signInWithGoogle, user } = useAuth();
 
@@ -30,12 +31,20 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setAuthError(null);
 
     try {
       await signIn(email, password);
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
+      
+      // Handle specific error cases
+      if (error.code === "email_not_confirmed") {
+        setAuthError("Your email has not been confirmed. Please check your inbox for a confirmation email.");
+      } else {
+        setAuthError(error.message || "Failed to sign in. Please check your credentials.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -43,12 +52,14 @@ const LoginPage = () => {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
+    setAuthError(null);
 
     try {
       await signInWithGoogle();
       // No need to navigate - the OAuth redirect will handle this
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google login error:", error);
+      setAuthError(error.message || "Failed to sign in with Google.");
       setIsLoading(false);
     }
   };
@@ -66,6 +77,12 @@ const LoginPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {authError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{authError}</AlertDescription>
+                </Alert>
+              )}
+              
               <Button 
                 variant="outline" 
                 className="w-full flex items-center justify-center gap-2" 
