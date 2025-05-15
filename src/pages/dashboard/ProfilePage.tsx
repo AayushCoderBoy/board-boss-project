@@ -1,305 +1,260 @@
 
-import { useState } from "react";
-import { DashboardHeader } from "@/components/dashboard/Header";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/components/ui/sonner";
 import { Separator } from "@/components/ui/separator";
-import { User } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+}
 
 const ProfilePage = () => {
-  const [profileData, setProfileData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    jobTitle: "Product Manager",
-    department: "Product",
-    location: "New York, USA",
-    bio: "Product Manager with 5+ years of experience in SaaS products.",
-    avatarUrl: "",
-  });
-  
-  const [password, setPassword] = useState({
-    current: "",
-    new: "",
-    confirm: "",
-  });
-  
-  const handleProfileUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Profile updated successfully!");
-  };
-  
-  const handlePasswordChange = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (password.new !== password.confirm) {
-      toast.error("New passwords don't match.");
-      return;
+  const { user, updateProfile } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
     }
-    
-    toast.success("Password changed successfully!");
-    setPassword({
-      current: "",
-      new: "",
-      confirm: "",
-    });
+  }, [user]);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      setFirstName(data.first_name || "");
+      setLastName(data.last_name || "");
+      setAvatarUrl(data.avatar_url || "");
+    } catch (error: any) {
+      toast.error("Error fetching profile");
+      console.error("Error fetching profile:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await updateProfile({
+        first_name: firstName,
+        last_name: lastName,
+        avatar_url: avatarUrl,
+      });
+      await fetchProfile();
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user?.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
+
+    try {
+      setUploadLoading(true);
+
+      // Check if storage bucket exists, if not create it
+      const { data: bucketExists } = await supabase.storage.getBucket('avatars');
+      if (!bucketExists) {
+        await supabase.storage.createBucket('avatars', {
+          public: true,
+          fileSizeLimit: 1024 * 1024 * 2 // 2MB
+        });
+      }
+
+      // Upload file
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      if (data) {
+        setAvatarUrl(data.publicUrl);
+        await updateProfile({ avatar_url: data.publicUrl });
+      }
+    } catch (error: any) {
+      toast.error("Error uploading avatar");
+      console.error("Error uploading avatar:", error);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  if (loading && !profile) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
   return (
-    <>
-      <DashboardHeader title="Profile" />
-      <main className="flex-1 overflow-auto p-6 bg-gray-50">
-        <div className="max-w-4xl mx-auto">
-          <Tabs defaultValue="account">
-            <TabsList className="mb-6">
-              <TabsTrigger value="account">Account</TabsTrigger>
-              <TabsTrigger value="security">Security</TabsTrigger>
-              <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="account">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Information</CardTitle>
-                  <CardDescription>Update your personal information.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleProfileUpdate}>
-                    <div className="flex flex-col md:flex-row gap-6 mb-6">
-                      <div className="flex flex-col items-center justify-center">
-                        <Avatar className="h-24 w-24 mb-4">
-                          <AvatarImage src={profileData.avatarUrl} alt="Profile" />
-                          <AvatarFallback className="bg-purple-100 text-purple-900">
-                            <User className="h-12 w-12" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <Button variant="outline" size="sm">Change Photo</Button>
-                      </div>
-                      
-                      <div className="flex-1 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="firstName">First name</Label>
-                            <Input 
-                              id="firstName" 
-                              value={profileData.firstName}
-                              onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="lastName">Last name</Label>
-                            <Input 
-                              id="lastName" 
-                              value={profileData.lastName}
-                              onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="email">Email</Label>
-                          <Input 
-                            id="email" 
-                            type="email" 
-                            value={profileData.email}
-                            onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Separator className="my-6" />
-                    
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="jobTitle">Job Title</Label>
-                          <Input 
-                            id="jobTitle" 
-                            value={profileData.jobTitle}
-                            onChange={(e) => setProfileData({...profileData, jobTitle: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="department">Department</Label>
-                          <Input 
-                            id="department" 
-                            value={profileData.department}
-                            onChange={(e) => setProfileData({...profileData, department: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="location">Location</Label>
-                        <Input 
-                          id="location" 
-                          value={profileData.location}
-                          onChange={(e) => setProfileData({...profileData, location: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="bio">Bio</Label>
-                        <textarea 
-                          id="bio" 
-                          className="w-full h-24 px-3 py-2 text-base placeholder-gray-500 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          value={profileData.bio}
-                          onChange={(e) => setProfileData({...profileData, bio: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 flex justify-end">
-                      <Button type="submit" className="bg-purple-500 hover:bg-purple-600">
-                        Save Changes
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="security">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Security</CardTitle>
-                  <CardDescription>Update your password and security settings.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handlePasswordChange}>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="currentPassword">Current Password</Label>
-                        <Input 
-                          id="currentPassword" 
-                          type="password"
-                          value={password.current}
-                          onChange={(e) => setPassword({...password, current: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="newPassword">New Password</Label>
-                        <Input 
-                          id="newPassword" 
-                          type="password"
-                          value={password.new}
-                          onChange={(e) => setPassword({...password, new: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                        <Input 
-                          id="confirmPassword" 
-                          type="password"
-                          value={password.confirm}
-                          onChange={(e) => setPassword({...password, confirm: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 flex justify-end">
-                      <Button type="submit" className="bg-purple-500 hover:bg-purple-600">
-                        Change Password
-                      </Button>
-                    </div>
-                  </form>
-                  
-                  <Separator className="my-6" />
-                  
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Two-Factor Authentication</h3>
-                    <p className="text-gray-500 mb-4">
-                      Add an extra layer of security to your account by enabling two-factor authentication.
-                    </p>
-                    <Button variant="outline">Enable 2FA</Button>
-                  </div>
-                  
-                  <Separator className="my-6" />
-                  
-                  <div>
-                    <h3 className="text-lg font-medium mb-4 text-red-500">Danger Zone</h3>
-                    <p className="text-gray-500 mb-4">
-                      Once you delete your account, there is no going back. Please be certain.
-                    </p>
-                    <Button variant="destructive">Delete Account</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="notifications">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notification Settings</CardTitle>
-                  <CardDescription>Manage how you receive notifications.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Email Notifications</h3>
-                      <div className="space-y-3">
-                        {[
-                          { id: "email-tasks", label: "Task assignments and updates" },
-                          { id: "email-projects", label: "Project updates and milestones" },
-                          { id: "email-comments", label: "Comments on your tasks" },
-                          { id: "email-team", label: "Team announcements" },
-                        ].map(item => (
-                          <div key={item.id} className="flex items-center justify-between">
-                            <Label htmlFor={item.id} className="cursor-pointer">
-                              {item.label}
-                            </Label>
-                            <input
-                              type="checkbox"
-                              id={item.id}
-                              defaultChecked
-                              className="h-4 w-4 rounded border-gray-300 text-purple-500 focus:ring-purple-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Push Notifications</h3>
-                      <div className="space-y-3">
-                        {[
-                          { id: "push-tasks", label: "Task assignments and updates" },
-                          { id: "push-projects", label: "Project updates and milestones" },
-                          { id: "push-comments", label: "Comments on your tasks" },
-                          { id: "push-team", label: "Team announcements" },
-                        ].map(item => (
-                          <div key={item.id} className="flex items-center justify-between">
-                            <Label htmlFor={item.id} className="cursor-pointer">
-                              {item.label}
-                            </Label>
-                            <input
-                              type="checkbox"
-                              id={item.id}
-                              defaultChecked
-                              className="h-4 w-4 rounded border-gray-300 text-purple-500 focus:ring-purple-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-end">
-                  <Button className="bg-purple-500 hover:bg-purple-600" onClick={() => toast.success("Notification settings saved!")}>
-                    Save Changes
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-          </Tabs>
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-8">Profile Settings</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Avatar</CardTitle>
+              <CardDescription>This is how others will recognize you</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center space-y-4">
+              <Avatar className="h-32 w-32">
+                <AvatarImage src={avatarUrl} />
+                <AvatarFallback>
+                  {firstName && lastName 
+                    ? `${firstName[0]}${lastName[0]}`
+                    : user?.email?.[0].toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="relative">
+                <Input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <Button 
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  disabled={uploadLoading}
+                  onClick={() => document.getElementById('avatar-upload')?.click()}
+                >
+                  {uploadLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  Upload new avatar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </main>
-    </>
+        
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Personal Information</CardTitle>
+              <CardDescription>Update your personal details</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input 
+                    id="email"
+                    value={user?.email || ""}
+                    disabled
+                    className="bg-gray-50"
+                  />
+                  <p className="text-xs text-gray-500">Your email cannot be changed</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input 
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Your first name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input 
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Your last name"
+                    />
+                  </div>
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="mt-6 bg-purple-500 hover:bg-purple-600"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+          
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle>Account Settings</CardTitle>
+              <CardDescription>Manage your account settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="change-password">Password</Label>
+                <div className="flex gap-4">
+                  <Input 
+                    id="change-password"
+                    type="password"
+                    value="••••••••"
+                    disabled
+                    className="bg-gray-50"
+                  />
+                  <Button variant="outline">
+                    Change Password
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 };
 
