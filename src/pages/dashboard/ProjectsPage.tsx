@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,8 +16,18 @@ interface Project {
   id: string;
   title: string;
   description: string | null;
+  deadline: string | null;
+  status: string | null;
   created_at: string;
 }
+
+const PROJECT_STATUSES = [
+  "Not Started",
+  "In Progress",
+  "On Hold",
+  "Completed",
+  "Cancelled"
+];
 
 const ProjectsPage = () => {
   const { user } = useAuth();
@@ -24,6 +35,8 @@ const ProjectsPage = () => {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [status, setStatus] = useState("Not Started");
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -70,6 +83,8 @@ const ProjectsPage = () => {
         .insert([{ 
           title: title.trim(),
           description: description.trim() || null,
+          deadline: deadline || null,
+          status,
           owner_id: user?.id
         }])
         .select();
@@ -104,7 +119,9 @@ const ProjectsPage = () => {
         .from("projects")
         .update({ 
           title: title.trim(),
-          description: description.trim() || null
+          description: description.trim() || null,
+          deadline: deadline || null,
+          status
         })
         .eq("id", projectToEdit.id);
 
@@ -150,6 +167,8 @@ const ProjectsPage = () => {
   const resetForm = () => {
     setTitle("");
     setDescription("");
+    setDeadline("");
+    setStatus("Not Started");
     setProjectToEdit(null);
   };
 
@@ -157,12 +176,25 @@ const ProjectsPage = () => {
     setProjectToEdit(project);
     setTitle(project.title);
     setDescription(project.description || "");
+    setDeadline(project.deadline || "");
+    setStatus(project.status || "Not Started");
     setIsEditDialogOpen(true);
   };
 
   const openDeleteDialog = (project: Project) => {
     setProjectToEdit(project);
     setIsDeleteDialogOpen(true);
+  };
+
+  const getStatusColor = (status: string | null) => {
+    switch (status) {
+      case "Not Started": return "bg-gray-100 text-gray-800";
+      case "In Progress": return "bg-blue-100 text-blue-800";
+      case "On Hold": return "bg-yellow-100 text-yellow-800";
+      case "Completed": return "bg-green-100 text-green-800";
+      case "Cancelled": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
   };
 
   return (
@@ -207,6 +239,31 @@ const ProjectsPage = () => {
                   placeholder="Enter project description"
                   rows={3}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deadline">Deadline (optional)</Label>
+                <Input 
+                  id="deadline"
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={setStatus}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <DialogFooter>
                 <Button 
@@ -284,7 +341,22 @@ const ProjectsPage = () => {
                     </div>
                   </div>
                   <CardDescription>
-                    Created on {new Date(project.created_at).toLocaleDateString()}
+                    <div className="flex flex-col space-y-2">
+                      <div>Created on {new Date(project.created_at).toLocaleDateString()}</div>
+                      {project.deadline && (
+                        <div className="flex items-center text-sm">
+                          <Calendar className="h-3 w-3 mr-1" /> 
+                          Due: {new Date(project.deadline).toLocaleDateString()}
+                        </div>
+                      )}
+                      {project.status && (
+                        <div className="mt-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
+                            {project.status}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
@@ -335,6 +407,31 @@ const ProjectsPage = () => {
                 placeholder="Enter project description"
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-deadline">Deadline (optional)</Label>
+              <Input 
+                id="edit-deadline"
+                type="datetime-local"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-status">Status</Label>
+              <Select
+                value={status}
+                onValueChange={setStatus}
+              >
+                <SelectTrigger id="edit-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROJECT_STATUSES.map((status) => (
+                    <SelectItem key={`edit-${status}`} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button 

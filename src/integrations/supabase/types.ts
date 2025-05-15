@@ -106,25 +106,31 @@ export type Database = {
       projects: {
         Row: {
           created_at: string
+          deadline: string | null
           description: string | null
           id: string
           owner_id: string
+          status: string | null
           title: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          deadline?: string | null
           description?: string | null
           id?: string
           owner_id: string
+          status?: string | null
           title: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          deadline?: string | null
           description?: string | null
           id?: string
           owner_id?: string
+          status?: string | null
           title?: string
           updated_at?: string
         }
@@ -140,6 +146,8 @@ export type Database = {
           due_date: string | null
           id: string
           position: number
+          priority: string | null
+          status: string | null
           title: string
           updated_at: string
         }
@@ -152,6 +160,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           position?: number
+          priority?: string | null
+          status?: string | null
           title: string
           updated_at?: string
         }
@@ -164,6 +174,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           position?: number
+          priority?: string | null
+          status?: string | null
           title?: string
           updated_at?: string
         }
