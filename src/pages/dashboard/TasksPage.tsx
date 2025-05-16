@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -146,11 +145,31 @@ const TasksPage = () => {
         
       if (boardError) throw boardError;
       
-      if (!boardData || boardData.length === 0) {
-        throw new Error("No board found for the selected project");
-      }
+      // If no board exists for the project, create a default one
+      let boardId;
       
-      const boardId = boardData[0].id;
+      if (!boardData || boardData.length === 0) {
+        // Create a default board for the project
+        const { data: newBoard, error: createBoardError } = await supabase
+          .from("boards")
+          .insert([{ 
+            title: "Default Board", 
+            project_id: selectedProject,
+            position: 0
+          }])
+          .select("id")
+          .single();
+          
+        if (createBoardError) throw createBoardError;
+        boardId = newBoard.id;
+        
+        toast({
+          title: "Created a default board for this project",
+          description: "Your task will be assigned to this board",
+        });
+      } else {
+        boardId = boardData[0].id;
+      }
       
       // Now create the task
       const { error } = await supabase
