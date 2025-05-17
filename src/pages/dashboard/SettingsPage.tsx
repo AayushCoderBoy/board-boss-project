@@ -138,6 +138,8 @@ const SettingsPage = () => {
     
     try {
       setResetPasswordLoading(true);
+      
+      // Use updateUser to change password - this properly updates auth credentials
       const { error } = await supabase.auth.updateUser({ 
         password: newPassword 
       });

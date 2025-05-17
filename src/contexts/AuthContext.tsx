@@ -37,12 +37,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Only set up the listener once
+    if (initialized) return;
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          navigate('/reset-password');
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -58,8 +67,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else if (event === 'SIGNED_OUT') {
           toast.success("Successfully signed out!");
-        } else if (event === 'PASSWORD_RECOVERY') {
-          navigate('/reset-password');
         } else if (event === 'USER_UPDATED') {
           toast.success("User information updated");
         }
@@ -79,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       setLoading(false);
+      setInitialized(true);
     });
 
     return () => subscription.unsubscribe();
