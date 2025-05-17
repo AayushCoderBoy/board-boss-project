@@ -18,6 +18,8 @@ import DashboardLayout from "./pages/DashboardLayout";
 import OverviewPage from "./pages/dashboard/OverviewPage";
 import ProjectsPage from "./pages/dashboard/ProjectsPage";
 import TasksPage from "./pages/dashboard/TasksPage";
+import CalendarPage from "./pages/dashboard/CalendarPage";
+import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 import ProfilePage from "./pages/dashboard/ProfilePage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 
@@ -42,6 +44,8 @@ const App = () => (
                 <Route index element={<OverviewPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="tasks" element={<TasksPage />} />
+                <Route path="calendar" element={<CalendarPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
