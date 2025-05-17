@@ -46,28 +46,55 @@ export type Database = {
       }
       profiles: {
         Row: {
+          auto_save: boolean | null
           avatar_url: string | null
+          browser_notifications: boolean | null
+          compact_mode: boolean | null
           created_at: string
+          email_notifications: boolean | null
           first_name: string | null
           id: string
+          language_preference: string | null
           last_name: string | null
+          mentions: boolean | null
+          task_reminders: boolean | null
+          theme_preference: string | null
           updated_at: string
+          usage_analytics: boolean | null
         }
         Insert: {
+          auto_save?: boolean | null
           avatar_url?: string | null
+          browser_notifications?: boolean | null
+          compact_mode?: boolean | null
           created_at?: string
+          email_notifications?: boolean | null
           first_name?: string | null
           id: string
+          language_preference?: string | null
           last_name?: string | null
+          mentions?: boolean | null
+          task_reminders?: boolean | null
+          theme_preference?: string | null
           updated_at?: string
+          usage_analytics?: boolean | null
         }
         Update: {
+          auto_save?: boolean | null
           avatar_url?: string | null
+          browser_notifications?: boolean | null
+          compact_mode?: boolean | null
           created_at?: string
+          email_notifications?: boolean | null
           first_name?: string | null
           id?: string
+          language_preference?: string | null
           last_name?: string | null
+          mentions?: boolean | null
+          task_reminders?: boolean | null
+          theme_preference?: string | null
           updated_at?: string
+          usage_analytics?: boolean | null
         }
         Relationships: []
       }

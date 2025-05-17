@@ -5,6 +5,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 
+interface ProfileData {
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
+  theme_preference?: string;
+  compact_mode?: boolean;
+  language_preference?: string;
+  email_notifications?: boolean;
+  browser_notifications?: boolean;
+  task_reminders?: boolean;
+  mentions?: boolean;
+  auto_save?: boolean;
+  usage_analytics?: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -13,7 +28,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (data: { first_name?: string; last_name?: string; avatar_url?: string }) => Promise<void>;
+  updateProfile: (data: ProfileData) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,10 +46,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
+        // Handle auth events
         if (event === 'SIGNED_IN') {
           toast.success("Successfully signed in!");
+          
+          // Create or ensure profile exists when user signs in
+          if (session?.user) {
+            setTimeout(() => {
+              ensureProfileExists(session.user.id);
+            }, 0);
+          }
         } else if (event === 'SIGNED_OUT') {
           toast.success("Successfully signed out!");
+        } else if (event === 'PASSWORD_RECOVERY') {
+          navigate('/reset-password');
+        } else if (event === 'USER_UPDATED') {
+          toast.success("User information updated");
         }
       }
     );
@@ -43,27 +70,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Create or ensure profile exists when app loads with existing session
+      if (session?.user) {
+        setTimeout(() => {
+          ensureProfileExists(session.user.id);
+        }, 0);
+      }
+      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // Ensure a profile record exists for the user
+  const ensureProfileExists = async (userId: string) => {
+    try {
+      // Check if profile exists
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .single();
+      
+      if (fetchError && fetchError.code !== "PGRST116") {
+        console.error("Error checking profile:", fetchError);
+        return;
+      }
+      
+      // If profile doesn't exist, create it with default values
+      if (!existingProfile) {
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert({
+            id: userId,
+            first_name: user?.user_metadata?.first_name || "",
+            last_name: user?.user_metadata?.last_name || "",
+            theme_preference: "light",
+            compact_mode: false,
+            language_preference: "English (US)",
+            email_notifications: true,
+            browser_notifications: true,
+            task_reminders: true,
+            mentions: true,
+            auto_save: true,
+            usage_analytics: false
+          });
+          
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+        }
+      }
+    } catch (error) {
+      console.error("Error in ensureProfileExists:", error);
+    }
+  };
+
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      const names = fullName.trim().split(" ");
+      const firstName = names[0] || "";
+      const lastName = names.slice(1).join(" ") || "";
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            first_name: fullName,
+            first_name: firstName,
+            last_name: lastName,
           },
         },
       });
 
       if (error) throw error;
       
-      // No need to redirect here as onAuthStateChange will handle it
+      toast.success("Sign up successful! Please check your email to verify your account.");
     } catch (error: any) {
       toast.error(error.message || "An error occurred during sign up");
       throw error;
@@ -79,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
       
-      // No need to redirect here as onAuthStateChange will handle it
+      navigate("/dashboard");
     } catch (error: any) {
       toast.error(error.message || "Invalid login credentials");
       throw error;
@@ -113,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateProfile = async (data: { first_name?: string; last_name?: string; avatar_url?: string }) => {
+  const updateProfile = async (data: ProfileData) => {
     if (!user) return;
     
     try {
@@ -123,7 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', user.id);
         
       if (error) throw error;
-      toast.success("Profile updated successfully!");
     } catch (error: any) {
       toast.error(error.message || "Error updating profile");
       throw error;

@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom";
 
 interface Profile {
   id: string;
@@ -26,6 +27,7 @@ const ProfilePage = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -66,8 +68,10 @@ const ProfilePage = () => {
         last_name: lastName,
         avatar_url: avatarUrl,
       });
+      toast.success("Profile updated successfully");
       await fetchProfile();
     } catch (error) {
+      toast.error("Error updating profile");
       console.error("Error updating profile:", error);
     } finally {
       setLoading(false);
@@ -86,7 +90,9 @@ const ProfilePage = () => {
       setUploadLoading(true);
 
       // Check if storage bucket exists, if not create it
-      const { data: bucketExists } = await supabase.storage.getBucket('avatars');
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === 'avatars');
+      
       if (!bucketExists) {
         await supabase.storage.createBucket('avatars', {
           public: true,
@@ -107,6 +113,7 @@ const ProfilePage = () => {
       if (data) {
         setAvatarUrl(data.publicUrl);
         await updateProfile({ avatar_url: data.publicUrl });
+        toast.success("Avatar uploaded successfully");
       }
     } catch (error: any) {
       toast.error("Error uploading avatar");
@@ -114,6 +121,11 @@ const ProfilePage = () => {
     } finally {
       setUploadLoading(false);
     }
+  };
+
+  const handleChangePassword = () => {
+    navigate("/dashboard/settings");
+    toast.info("You can change your password in the Advanced tab of Settings");
   };
 
   if (loading && !profile) {
@@ -245,7 +257,7 @@ const ProfilePage = () => {
                     disabled
                     className="bg-gray-50"
                   />
-                  <Button variant="outline">
+                  <Button variant="outline" onClick={handleChangePassword}>
                     Change Password
                   </Button>
                 </div>
